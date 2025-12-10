@@ -51,7 +51,7 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
   }
 
   Future<void> fetchStages() async {
-    // ⚠️ IMPORTANT: CHANGE THIS URL BASED ON YOUR DEVICE
+    // IMPORTANT: CHANGE THIS URL BASED ON YOUR DEVICE
     // Android Emulator: 'http://10.0.2.2:3000/api/stages'
     // iOS Simulator:    'http://localhost:3000/api/stages'
     // Physical Phone:   'http://YOUR_PC_IP:3000/api/stages'
