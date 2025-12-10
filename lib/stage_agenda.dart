@@ -55,7 +55,7 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
     // Android Emulator: 'http://10.0.2.2:3000/api/stages'
     // iOS Simulator:    'http://localhost:3000/api/stages'
     // Physical Phone:   'http://YOUR_PC_IP:3000/api/stages'
-    const String url = 'http://localhost:3000/api/stages'; 
+    const String url = 'https://mern-back-stage-aikido.vercel.app/api/stages'; 
 
     try {
       final response = await http.get(Uri.parse(url));
