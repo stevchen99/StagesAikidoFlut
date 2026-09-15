@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:grouped_list/grouped_list.dart';
+import 'package:url_launcher/url_launcher.dart'; // Optional: run 'flutter pub add url_launcher' to make links clickable
 
 class Stage {
   final String id;
   final DateTime date;
-  final String place;
+  final String address;
+  final String? link;
   final String stageName;
   final double cost;
   final String dept;
@@ -15,7 +17,8 @@ class Stage {
   Stage({
     required this.id,
     required this.date,
-    required this.place,
+    required this.address,
+    this.link,
     required this.stageName,
     required this.cost,
     required this.dept,
@@ -25,10 +28,12 @@ class Stage {
     return Stage(
       id: json['_id'],
       date: DateTime.parse(json['date']),
-      place: json['place'],
-      stageName: json['stageName'],
+      // Fallback: checks 'address' first, then 'place' for legacy data
+      address: json['address'] ?? json['place'] ?? '',
+      link: json['link'],
+      stageName: json['stageName'] ?? '',
       cost: (json['cost'] as num).toDouble(),
-      dept: json['dept'],
+      dept: json['dept'] ?? '',
     );
   }
 }
@@ -51,10 +56,6 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
   }
 
   Future<void> fetchStages() async {
-    // IMPORTANT: CHANGE THIS URL BASED ON YOUR DEVICE
-    // Android Emulator: 'http://10.0.2.2:3000/api/stages'
-    // iOS Simulator:    'http://localhost:3000/api/stages'
-    // Physical Phone:   'http://YOUR_PC_IP:3000/api/stages'
     const String url = 'https://mern-back-stage-aikido.vercel.app/api/stages'; 
 
     try {
@@ -105,10 +106,10 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
                 );
               },
               itemBuilder: (context, Stage stage) => AgendaItem(stage: stage),
-              itemComparator: (item1, item2) => item1.date.compareTo(item2.date), // Sort dates
+              itemComparator: (item1, item2) => item1.date.compareTo(item2.date),
               useStickyGroupSeparators: true,
               floatingHeader: true,
-              order: GroupedListOrder.ASC, // Oldest date at top
+              order: GroupedListOrder.ASC,
             ),
     );
   }
@@ -117,6 +118,14 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
 class AgendaItem extends StatelessWidget {
   final Stage stage;
   const AgendaItem({super.key, required this.stage});
+
+  // Helper method to open URLs
+  Future<void> _launchURL(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +137,7 @@ class AgendaItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date
+          // Date Column
           Column(
             children: [
               Text(
@@ -142,7 +151,8 @@ class AgendaItem extends StatelessWidget {
             ],
           ),
           const SizedBox(width: 16),
-          // Info
+          
+          // Stage Info Column
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,26 +162,91 @@ class AgendaItem extends StatelessWidget {
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 4),
+                
+                // Address Row
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.location_on, size: 12, color: Colors.grey.shade600),
+                    Icon(Icons.location_on, size: 14, color: Colors.grey.shade600),
                     const SizedBox(width: 4),
-                    Text(stage.place, style: TextStyle(color: Colors.grey.shade600)),
+                    Expanded(
+                      child: Text(
+                        stage.address,
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                      ),
+                    ),
                   ],
                 ),
+
+                // Link Row (only renders if a link exists)
+                if (stage.link != null && stage.link!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  InkWell(
+                    onTap: () => _launchURL(stage.link!),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.link, size: 14, color: Colors.indigo),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            stage.link!,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.indigo,
+                              fontSize: 12,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          // Dept Bubble
-          Container(
-             margin: const EdgeInsets.only(left: 8),
-             padding: const EdgeInsets.all(6),
-             decoration: BoxDecoration(
-               color: Colors.blue.shade50,
-               borderRadius: BorderRadius.circular(6)
-             ),
-             child: Text(stage.dept, style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.bold, fontSize: 12)),
-          )
+
+          // Badges: Cost and Dept
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Price / Cost Bubble
+              Container(
+                margin: const EdgeInsets.only(left: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${stage.cost.toStringAsFixed(stage.cost.truncateToDouble() == stage.cost ? 0 : 2)} €',
+                  style: TextStyle(
+                    color: Colors.green.shade900,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+
+              // Dept Bubble
+              Container(
+                margin: const EdgeInsets.only(left: 6),
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  stage.dept,
+                  style: TextStyle(
+                    color: Colors.blue.shade900,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
