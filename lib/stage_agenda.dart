@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:grouped_list/grouped_list.dart';
-import 'package:url_launcher/url_launcher.dart'; // Optional: run 'flutter pub add url_launcher' to make links clickable
+import 'package:url_launcher/url_launcher.dart';
 
 class Stage {
   final String id;
@@ -28,11 +28,10 @@ class Stage {
     return Stage(
       id: json['_id'],
       date: DateTime.parse(json['date']),
-      // Fallback: checks 'address' first, then 'place' for legacy data
-      address: json['address'] ?? json['place'] ?? '',
+      address: json['address'] ?? '',
       link: json['link'],
       stageName: json['stageName'] ?? '',
-      cost: (json['cost'] as num).toDouble(),
+      cost: json['cost'] != null ? (json['cost'] as num).toDouble() : 0.0,
       dept: json['dept'] ?? '',
     );
   }
@@ -119,7 +118,6 @@ class AgendaItem extends StatelessWidget {
   final Stage stage;
   const AgendaItem({super.key, required this.stage});
 
-  // Helper method to open URLs
   Future<void> _launchURL(String urlString) async {
     final Uri url = Uri.parse(urlString);
     if (await canLaunchUrl(url)) {
@@ -137,7 +135,7 @@ class AgendaItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date Column
+          // Date
           Column(
             children: [
               Text(
@@ -152,7 +150,7 @@ class AgendaItem extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           
-          // Stage Info Column
+          // Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,7 +176,7 @@ class AgendaItem extends StatelessWidget {
                   ],
                 ),
 
-                // Link Row (only renders if a link exists)
+                // Link Row
                 if (stage.link != null && stage.link!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   InkWell(
@@ -206,11 +204,11 @@ class AgendaItem extends StatelessWidget {
             ),
           ),
 
-          // Badges: Cost and Dept
+          // Price & Dept Badges
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Price / Cost Bubble
+              // Cost Bubble
               Container(
                 margin: const EdgeInsets.only(left: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -219,7 +217,7 @@ class AgendaItem extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  '${stage.cost.toStringAsFixed(stage.cost.truncateToDouble() == stage.cost ? 0 : 2)} €',
+                  '${stage.cost.toStringAsFixed(2)} €',
                   style: TextStyle(
                     color: Colors.green.shade900,
                     fontWeight: FontWeight.bold,
