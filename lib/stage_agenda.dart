@@ -202,20 +202,17 @@ class AgendaItem extends StatelessWidget {
                   const SizedBox(height: 4),
                   InkWell(
                     onTap: () => _launchURL(stage.link!),
-                    child: Row(
+                    child: const Row(
                       children: [
-                        const Icon(Icons.link, size: 14, color: Colors.indigo),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            stage.link!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.indigo,
-                              fontSize: 12,
-                              decoration: TextDecoration.underline,
-                            ),
+                        Icon(Icons.link, size: 14, color: Colors.indigo),
+                        SizedBox(width: 4),
+                        Text(
+                          'Inscription',
+                          style: TextStyle(
+                            color: Colors.indigo,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
                           ),
                         ),
                       ],
