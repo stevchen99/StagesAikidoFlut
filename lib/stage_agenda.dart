@@ -116,7 +116,27 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
 
 class AgendaItem extends StatelessWidget {
   final Stage stage;
-  const AgendaItem({super.key, required this.stage});
+  const AgendaItem({super.key});
+
+  // Helper method to format address into a single line (Rue, Ville)
+  String _formatSingleLineAddress(String fullAddress) {
+    if (fullAddress.isEmpty) return '';
+    
+    // Split by comma or newlines to isolate main address components
+    List<String> parts = fullAddress
+        .split(RegExp(r'[,\n]'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    if (parts.isEmpty) return fullAddress;
+    
+    // Take up to the first 2 parts (e.g., Street and City) to keep it concise
+    if (parts.length >= 2) {
+      return '${parts[0]}, ${parts[1]}';
+    }
+    return parts[0];
+  }
 
   Future<void> _launchURL(String urlString) async {
     final Uri url = Uri.parse(urlString);
@@ -161,15 +181,17 @@ class AgendaItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 
-                // Address Row
+                // Address Row (Single line, truncated with ellipsis if long)
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(Icons.location_on, size: 14, color: Colors.grey.shade600),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        stage.address,
+                        _formatSingleLineAddress(stage.address),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
                         style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                       ),
                     ),
@@ -188,6 +210,7 @@ class AgendaItem extends StatelessWidget {
                         Expanded(
                           child: Text(
                             stage.link!,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.indigo,
