@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -119,7 +120,7 @@ class AgendaItem extends StatelessWidget {
 
   const AgendaItem({super.key, required this.stage});
 
-  // Helper method to format address into a single line (Rue, Ville)
+  // Formats multi-line addresses into a single concise line (Rue, Ville)
   String _formatSingleLineAddress(String fullAddress) {
     if (fullAddress.isEmpty) return '';
     
@@ -137,6 +138,26 @@ class AgendaItem extends StatelessWidget {
     return parts[0];
   }
 
+  // Opens Apple Maps on iOS/macOS and Google Maps on Android/Web
+  Future<void> _openMap(BuildContext context, String address) async {
+    if (address.isEmpty) return;
+
+    final String encodedAddress = Uri.encodeComponent(address);
+    final Uri mapUri;
+
+    final TargetPlatform platform = Theme.of(context).platform;
+
+    if (platform == TargetPlatform.iOS || platform == TargetPlatform.macOS) {
+      mapUri = Uri.parse('https://maps.apple.com/?q=$encodedAddress');
+    } else {
+      mapUri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encodedAddress');
+    }
+
+    if (await canLaunchUrl(mapUri)) {
+      await launchUrl(mapUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   Future<void> _launchURL(String urlString) async {
     final Uri url = Uri.parse(urlString);
     if (await canLaunchUrl(url)) {
@@ -146,6 +167,8 @@ class AgendaItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final formattedAddress = _formatSingleLineAddress(stage.address);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -154,7 +177,7 @@ class AgendaItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date
+          // Date Column
           Column(
             children: [
               Text(
@@ -169,7 +192,7 @@ class AgendaItem extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           
-          // Info
+          // Stage Info Column
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,24 +203,32 @@ class AgendaItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 
-                // Address Row (Single line, truncated with ellipsis if long)
-                Row(
-                  children: [
-                    Icon(Icons.location_on, size: 14, color: Colors.grey.shade600),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        _formatSingleLineAddress(stage.address),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        softWrap: false,
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                      ),
+                // Clickable Single Line Address (Opens Apple Maps or Google Maps)
+                if (stage.address.isNotEmpty)
+                  InkWell(
+                    onTap: () => _openMap(context, stage.address),
+                    child: Row(
+                      children: [
+                        Icon(Icons.location_on, size: 14, color: Colors.indigo.shade600),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            formattedAddress,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false,
+                            style: TextStyle(
+                              color: Colors.indigo.shade600,
+                              fontSize: 13,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
 
-                // Link Row
+                // Link Row ("Inscription")
                 if (stage.link != null && stage.link!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   InkWell(
