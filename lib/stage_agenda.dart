@@ -116,13 +116,13 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
 
 class AgendaItem extends StatelessWidget {
   final Stage stage;
-  const AgendaItem({super.key});
+
+  const AgendaItem({super.key, required this.stage});
 
   // Helper method to format address into a single line (Rue, Ville)
   String _formatSingleLineAddress(String fullAddress) {
     if (fullAddress.isEmpty) return '';
     
-    // Split by comma or newlines to isolate main address components
     List<String> parts = fullAddress
         .split(RegExp(r'[,\n]'))
         .map((s) => s.trim())
@@ -131,7 +131,6 @@ class AgendaItem extends StatelessWidget {
 
     if (parts.isEmpty) return fullAddress;
     
-    // Take up to the first 2 parts (e.g., Street and City) to keep it concise
     if (parts.length >= 2) {
       return '${parts[0]}, ${parts[1]}';
     }
