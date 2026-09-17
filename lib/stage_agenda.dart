@@ -14,8 +14,8 @@ class Enseignant {
 
   factory Enseignant.fromJson(Map<String, dynamic> json) {
     return Enseignant(
-      firstName: json['firstName'] ?? '',
-      lastName: json['lastName'] ?? '',
+      firstName: json['firstName'] ?? json['prenom'] ?? '',
+      lastName: json['lastName'] ?? json['nom'] ?? '',
     );
   }
 
@@ -44,18 +44,22 @@ class Stage {
   });
 
   factory Stage.fromJson(Map<String, dynamic> json) {
+    // Parse enseignants array
     var enseignantsList = json['enseignants'] as List? ?? [];
     List<Enseignant> parsedEnseignants =
         enseignantsList.map((item) => Enseignant.fromJson(item)).toList();
 
+    // Field mapping with fallbacks for both APIs
+    String rawDate = json['dateDebut'] ?? json['date'] ?? DateTime.now().toIso8601String();
+    
     return Stage(
-      id: json['_id'],
-      date: DateTime.parse(json['date']),
-      address: json['address'] ?? '',
-      link: json['link'],
-      stageName: json['stageName'] ?? '',
+      id: json['_id'] ?? json['id']?.toString() ?? UniqueKey().toString(),
+      date: DateTime.parse(rawDate),
+      address: json['adresseComplete'] ?? json['address'] ?? json['place'] ?? '',
+      link: json['url'] ?? json['link'],
+      stageName: json['titre'] ?? json['stageName'] ?? '',
       cost: json['cost'] != null ? (json['cost'] as num).toDouble() : 0.0,
-      dept: json['dept'] ?? '',
+      dept: json['dept']?.toString() ?? json['departement']?.toString() ?? '',
       enseignants: parsedEnseignants,
     );
   }
@@ -79,23 +83,40 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
   }
 
   Future<void> fetchStages() async {
-    const String url = 'https://mern-back-stage-aikido.vercel.app/api/stages';
+    const String primaryApiUrl = 'https://mern-back-stage-aikido.vercel.app/api/stages';
+    const String secondaryApiUrl = 'https://api.stages-aikido.fr/public/stages';
 
     try {
-      final response = await http.get(Uri.parse(url));
+      // Execute both requests concurrently
+      final responses = await Future.wait([
+        http.get(Uri.parse(primaryApiUrl)).catchError((_) => http.Response('[]', 500)),
+        http.get(Uri.parse(secondaryApiUrl)).catchError((_) => http.Response('[]', 500)),
+      ]);
 
-      if (response.statusCode == 200) {
-        List<dynamic> body = jsonDecode(response.body);
-        setState(() {
-          stages = body.map((item) => Stage.fromJson(item)).toList();
-          isLoading = false;
-        });
-      } else {
-        print("Server Error: ${response.statusCode}");
-        setState(() => isLoading = false);
+      List<Stage> combinedStages = [];
+
+      // 1. Process Primary API
+      if (responses[0].statusCode == 200) {
+        List<dynamic> body1 = jsonDecode(responses[0].body);
+        combinedStages.addAll(body1.map((item) => Stage.fromJson(item)).toList());
       }
+
+      // 2. Process Secondary API (Filtering by federation == 'FFAB')
+      if (responses[1].statusCode == 200) {
+        List<dynamic> body2 = jsonDecode(responses[1].body);
+        var ffabStages = body2
+            .where((item) => item['federation'] == 'FFAB')
+            .map((item) => Stage.fromJson(item))
+            .toList();
+        combinedStages.addAll(ffabStages);
+      }
+
+      setState(() {
+        stages = combinedStages;
+        isLoading = false;
+      });
     } catch (e) {
-      print("Connection Error: $e");
+      print("Error fetching stages: $e");
       setState(() => isLoading = false);
     }
   }
@@ -143,7 +164,6 @@ class AgendaItem extends StatelessWidget {
 
   const AgendaItem({super.key, required this.stage});
 
-  // Formats multi-line addresses into a single concise line (Rue, Ville)
   String _formatSingleLineAddress(String fullAddress) {
     if (fullAddress.isEmpty) return '';
 
@@ -161,7 +181,6 @@ class AgendaItem extends StatelessWidget {
     return parts[0];
   }
 
-  // Opens Apple Maps on iOS/macOS and Google Maps on Android/Web
   Future<void> _openMap(BuildContext context, String address) async {
     if (address.isEmpty) return;
 
@@ -221,13 +240,13 @@ class AgendaItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Stage Title
+                // Title
                 Text(
                   stage.stageName,
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
 
-                // Enseignant (1st teacher under title)
+                // 1st Enseignant directly under title
                 if (firstTeacher != null && firstTeacher.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Row(
@@ -252,7 +271,7 @@ class AgendaItem extends StatelessWidget {
 
                 const SizedBox(height: 4),
 
-                // Clickable Single Line Address
+                // Map Address
                 if (stage.address.isNotEmpty)
                   InkWell(
                     onTap: () => _openMap(context, stage.address),
@@ -280,7 +299,7 @@ class AgendaItem extends StatelessWidget {
             ),
           ),
 
-          // Right Column: Inscription, Price & Dept Badges
+          // Right Column: Price, Dept, Inscription
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -288,44 +307,46 @@ class AgendaItem extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Cost Bubble
-                  Container(
-                    margin: const EdgeInsets.only(left: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '${stage.cost.toStringAsFixed(2)} €',
-                      style: TextStyle(
-                        color: Colors.green.shade900,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                  if (stage.cost > 0)
+                    Container(
+                      margin: const EdgeInsets.only(left: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${stage.cost.toStringAsFixed(2)} €',
+                        style: TextStyle(
+                          color: Colors.green.shade900,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
-                  ),
 
                   // Dept Bubble
-                  Container(
-                    margin: const EdgeInsets.only(left: 6),
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      stage.dept,
-                      style: TextStyle(
-                        color: Colors.blue.shade900,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                  if (stage.dept.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(left: 6),
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        stage.dept,
+                        style: TextStyle(
+                          color: Colors.blue.shade900,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
 
-              // Inscription Link aligned to the right bottom
+              // Inscription Link (Moved to bottom right)
               if (stage.link != null && stage.link!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 InkWell(
