@@ -44,7 +44,7 @@ class Stage {
   });
 
   factory Stage.fromJson(Map<String, dynamic> json) {
-    // Explicitly cast JSON lists to prevent Web minification runtime errors
+    // Parse teachers array
     final List<dynamic> enseignantsList = (json['enseignants'] as List<dynamic>?) ?? [];
     
     final List<Enseignant> parsedEnseignants = enseignantsList
@@ -52,11 +52,15 @@ class Stage {
         .map((item) => Enseignant.fromJson(Map<String, dynamic>.from(item as Map)))
         .toList();
 
-    String rawDate = json['dateDebut']?.toString() ?? json['date']?.toString() ?? DateTime.now().toIso8601String();
+    // Map `dateDebut` from the API to local `date`
+    dynamic rawDate = json['dateDebut'] ?? json['date'];
     DateTime parsedDate;
-    try {
-      parsedDate = DateTime.parse(rawDate);
-    } catch (_) {
+
+    if (rawDate is String) {
+      parsedDate = DateTime.tryParse(rawDate) ?? DateTime.now();
+    } else if (rawDate is int) {
+      parsedDate = DateTime.fromMillisecondsSinceEpoch(rawDate);
+    } else {
       parsedDate = DateTime.now();
     }
 
@@ -102,7 +106,7 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
 
       List<Stage> combinedStages = [];
 
-      // 1. Process Primary API
+      // Primary API
       if (responses[0].statusCode == 200) {
         dynamic decoded1 = jsonDecode(responses[0].body);
         if (decoded1 is List) {
@@ -114,7 +118,7 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
         }
       }
 
-      // 2. Process Secondary API (FFAB only)
+      // Secondary API (FFAB only)
       if (responses[1].statusCode == 200) {
         dynamic decoded2 = jsonDecode(responses[1].body);
         if (decoded2 is List) {
@@ -134,7 +138,6 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
         print("Error fetching stages: $e");
       }
     } finally {
-      // Guaranteed to set loading false so app never hangs on a blank screen
       setState(() {
         isLoading = false;
       });
