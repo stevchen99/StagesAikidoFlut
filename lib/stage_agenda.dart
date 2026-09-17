@@ -220,7 +220,7 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agenda 2025-2026', style: TextStyle(color: Colors.black)),
+        title: const Text('Agenda 2026-2027', style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
         elevation: 1,
       ),
