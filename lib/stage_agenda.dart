@@ -6,6 +6,22 @@ import 'package:intl/intl.dart';
 import 'package:grouped_list/grouped_list.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+class Enseignant {
+  final String firstName;
+  final String lastName;
+
+  Enseignant({required this.firstName, required this.lastName});
+
+  factory Enseignant.fromJson(Map<String, dynamic> json) {
+    return Enseignant(
+      firstName: json['firstName'] ?? '',
+      lastName: json['lastName'] ?? '',
+    );
+  }
+
+  String get fullName => '$firstName $lastName'.trim();
+}
+
 class Stage {
   final String id;
   final DateTime date;
@@ -14,6 +30,7 @@ class Stage {
   final String stageName;
   final double cost;
   final String dept;
+  final List<Enseignant> enseignants;
 
   Stage({
     required this.id,
@@ -23,9 +40,14 @@ class Stage {
     required this.stageName,
     required this.cost,
     required this.dept,
+    required this.enseignants,
   });
 
   factory Stage.fromJson(Map<String, dynamic> json) {
+    var enseignantsList = json['enseignants'] as List? ?? [];
+    List<Enseignant> parsedEnseignants =
+        enseignantsList.map((item) => Enseignant.fromJson(item)).toList();
+
     return Stage(
       id: json['_id'],
       date: DateTime.parse(json['date']),
@@ -34,6 +56,7 @@ class Stage {
       stageName: json['stageName'] ?? '',
       cost: json['cost'] != null ? (json['cost'] as num).toDouble() : 0.0,
       dept: json['dept'] ?? '',
+      enseignants: parsedEnseignants,
     );
   }
 }
@@ -56,7 +79,7 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
   }
 
   Future<void> fetchStages() async {
-    const String url = 'https://mern-back-stage-aikido.vercel.app/api/stages'; 
+    const String url = 'https://mern-back-stage-aikido.vercel.app/api/stages';
 
     try {
       final response = await http.get(Uri.parse(url));
@@ -123,7 +146,7 @@ class AgendaItem extends StatelessWidget {
   // Formats multi-line addresses into a single concise line (Rue, Ville)
   String _formatSingleLineAddress(String fullAddress) {
     if (fullAddress.isEmpty) return '';
-    
+
     List<String> parts = fullAddress
         .split(RegExp(r'[,\n]'))
         .map((s) => s.trim())
@@ -131,7 +154,7 @@ class AgendaItem extends StatelessWidget {
         .toList();
 
     if (parts.isEmpty) return fullAddress;
-    
+
     if (parts.length >= 2) {
       return '${parts[0]}, ${parts[1]}';
     }
@@ -168,6 +191,7 @@ class AgendaItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formattedAddress = _formatSingleLineAddress(stage.address);
+    final firstTeacher = stage.enseignants.isNotEmpty ? stage.enseignants.first.fullName : null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -191,19 +215,44 @@ class AgendaItem extends StatelessWidget {
             ],
           ),
           const SizedBox(width: 16),
-          
+
           // Stage Info Column
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Stage Title
                 Text(
                   stage.stageName,
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
+
+                // Enseignant (1st teacher under title)
+                if (firstTeacher != null && firstTeacher.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(Icons.person, size: 14, color: Colors.grey.shade700),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          firstTeacher,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
                 const SizedBox(height: 4),
-                
-                // Clickable Single Line Address (Opens Apple Maps or Google Maps)
+
+                // Clickable Single Line Address
                 if (stage.address.isNotEmpty)
                   InkWell(
                     onTap: () => _openMap(context, stage.address),
@@ -227,72 +276,78 @@ class AgendaItem extends StatelessWidget {
                       ],
                     ),
                   ),
-
-                // Link Row ("Inscription")
-                if (stage.link != null && stage.link!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  InkWell(
-                    onTap: () => _launchURL(stage.link!),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.link, size: 14, color: Colors.indigo),
-                        SizedBox(width: 4),
-                        Text(
-                          'Inscription',
-                          style: TextStyle(
-                            color: Colors.indigo,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
 
-          // Price & Dept Badges
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          // Right Column: Inscription, Price & Dept Badges
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Cost Bubble
-              Container(
-                margin: const EdgeInsets.only(left: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '${stage.cost.toStringAsFixed(2)} €',
-                  style: TextStyle(
-                    color: Colors.green.shade900,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Cost Bubble
+                  Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${stage.cost.toStringAsFixed(2)} €',
+                      style: TextStyle(
+                        color: Colors.green.shade900,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
-                ),
+
+                  // Dept Bubble
+                  Container(
+                    margin: const EdgeInsets.only(left: 6),
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      stage.dept,
+                      style: TextStyle(
+                        color: Colors.blue.shade900,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
-              // Dept Bubble
-              Container(
-                margin: const EdgeInsets.only(left: 6),
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  stage.dept,
-                  style: TextStyle(
-                    color: Colors.blue.shade900,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+              // Inscription Link aligned to the right bottom
+              if (stage.link != null && stage.link!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () => _launchURL(stage.link!),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.link, size: 14, color: Colors.indigo),
+                      SizedBox(width: 4),
+                      Text(
+                        'Inscription',
+                        style: TextStyle(
+                          color: Colors.indigo,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ],
