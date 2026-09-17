@@ -44,24 +44,41 @@ class Stage {
   });
 
   factory Stage.fromJson(Map<String, dynamic> json) {
-    // Parse teachers array
+    // Parse teachers array safely
     final List<dynamic> enseignantsList = (json['enseignants'] as List<dynamic>?) ?? [];
-    
     final List<Enseignant> parsedEnseignants = enseignantsList
         .where((item) => item is Map)
         .map((item) => Enseignant.fromJson(Map<String, dynamic>.from(item as Map)))
         .toList();
 
-    // Map `dateDebut` from the API to local `date`
+    // Extract raw date field prioritizing dateDebut then date
     dynamic rawDate = json['dateDebut'] ?? json['date'];
-    DateTime parsedDate;
 
-    if (rawDate is String) {
-      parsedDate = DateTime.tryParse(rawDate) ?? DateTime.now();
-    } else if (rawDate is int) {
-      parsedDate = DateTime.fromMillisecondsSinceEpoch(rawDate);
-    } else {
-      parsedDate = DateTime.now();
+    // Handle Mongoose / MongoDB nested date objects like {"$date": "2025-10-12T00:00:00Z"}
+    if (rawDate is Map) {
+      rawDate = rawDate['\$date'] ?? rawDate['date'];
+    }
+
+    DateTime parsedDate = DateTime.now();
+
+    if (rawDate != null) {
+      String dateStr = rawDate.toString().trim();
+
+      // Handle DD/MM/YYYY or DD-MM-YYYY formats from French APIs
+      if (RegExp(r'^\d{2}[/-]\d{2}[/-]\d{4}').hasMatch(dateStr)) {
+        try {
+          List<String> parts = dateStr.contains('/') ? dateStr.split('/') : dateStr.split('-');
+          int day = int.parse(parts[0]);
+          int month = int.parse(parts[1]);
+          int year = int.parse(parts[2].substring(0, 4));
+          parsedDate = DateTime(year, month, day);
+        } catch (_) {}
+      } 
+      // Handle standard ISO-8601 strings or Milliseconds
+      else {
+        parsedDate = DateTime.tryParse(dateStr) ?? 
+            (rawDate is int ? DateTime.fromMillisecondsSinceEpoch(rawDate) : DateTime.now());
+      }
     }
 
     return Stage(
