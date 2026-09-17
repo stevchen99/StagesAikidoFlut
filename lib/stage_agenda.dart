@@ -127,6 +127,17 @@ class Stage {
       }
     }
 
+    // --- EXTRACTION DU DÉPARTEMENT (2 PREMIERS CHIFFRES DU CODE POSTAL) ---
+    String extractedDept = json['dept']?.toString() ?? json['departement']?.toString() ?? '';
+
+    if (extractedDept.isEmpty && extractedAddress.isNotEmpty) {
+      final postalCodeMatch = RegExp(r'\b(\d{5})\b').firstMatch(extractedAddress);
+      if (postalCodeMatch != null) {
+        String postalCode = postalCodeMatch.group(1)!;
+        extractedDept = postalCode.substring(0, 2);
+      }
+    }
+
     return Stage(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? UniqueKey().toString(),
       date: parsedDate,
@@ -134,7 +145,7 @@ class Stage {
       link: json['url']?.toString() ?? json['link']?.toString(),
       stageName: processedTitle.isEmpty ? rawTitle : processedTitle,
       cost: json['cost'] != null ? (json['cost'] as num).toDouble() : 0.0,
-      dept: json['dept']?.toString() ?? json['departement']?.toString() ?? '',
+      dept: extractedDept,
       enseignants: parsedEnseignants,
     );
   }
@@ -288,7 +299,7 @@ class AgendaItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date en français (ex: "19", "SAM.")
+          // Date
           Column(
             children: [
               Text(
@@ -303,18 +314,18 @@ class AgendaItem extends StatelessWidget {
           ),
           const SizedBox(width: 16),
 
-          // Informations du stage
+          // Content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Titre
+                // Title
                 Text(
                   stage.stageName,
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
 
-                // Enseignant
+                // Teacher
                 if (firstTeacher != null && firstTeacher.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Row(
@@ -339,7 +350,7 @@ class AgendaItem extends StatelessWidget {
 
                 const SizedBox(height: 4),
 
-                // Adresse
+                // Address
                 if (stage.address.isNotEmpty)
                   InkWell(
                     onTap: () => _openMap(context, stage.address),
@@ -366,7 +377,7 @@ class AgendaItem extends StatelessWidget {
             ),
           ),
 
-          // Tarif, Département et Lien d'inscription
+          // Cost / Dept / Link
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
