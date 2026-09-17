@@ -108,16 +108,13 @@ class Stage {
     // --- EXTRACTION DE ADRESSECOMPLETE ---
     String extractedAddress = '';
 
-    // 1. Si adresseComplete est une clé de niveau supérieur dans le JSON
     if (json['adresseComplete'] != null) {
       extractedAddress = json['adresseComplete'].toString();
     } 
-    // 2. Si adresse est un Map englobant { "adresseComplete": "..." }
     else if (json['adresse'] is Map) {
       extractedAddress = json['adresse']['adresseComplete']?.toString() ?? 
                          json['adresse']['adresse']?.toString() ?? '';
     } 
-    // 3. Si l'adresse est retournée sous forme de string brute "{region: ..., adresseComplete: ...}"
     else if (json['adresse'] is String) {
       String rawAddressStr = json['adresse'];
       if (rawAddressStr.contains('adresseComplete:')) {
@@ -223,13 +220,13 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
               ? const Center(child: Text('Aucun stage disponible'))
               : GroupedListView<Stage, String>(
                   elements: stages,
-                  groupBy: (element) => DateFormat('yyyy-MM').format(element.date),
+                  groupBy: (element) => DateFormat('yyyy-MM', 'fr_FR').format(element.date),
                   groupSeparatorBuilder: (String groupByValue) {
-                    DateTime date = DateFormat('yyyy-MM').parse(groupByValue);
+                    DateTime date = DateFormat('yyyy-MM', 'fr_FR').parse(groupByValue);
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       child: Text(
-                        DateFormat('MMMM yyyy').format(date).toUpperCase(),
+                        DateFormat('MMMM yyyy', 'fr_FR').format(date).toUpperCase(),
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -291,33 +288,33 @@ class AgendaItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date
+          // Date en français (ex: "19", "SAM.")
           Column(
             children: [
               Text(
-                DateFormat('dd').format(stage.date),
+                DateFormat('dd', 'fr_FR').format(stage.date),
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               Text(
-                DateFormat('E').format(stage.date).toUpperCase(),
+                DateFormat('E', 'fr_FR').format(stage.date).toUpperCase(),
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
               ),
             ],
           ),
           const SizedBox(width: 16),
 
-          // Content
+          // Informations du stage
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title
+                // Titre
                 Text(
                   stage.stageName,
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
 
-                // Teacher
+                // Enseignant
                 if (firstTeacher != null && firstTeacher.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Row(
@@ -342,7 +339,7 @@ class AgendaItem extends StatelessWidget {
 
                 const SizedBox(height: 4),
 
-                // Address
+                // Adresse
                 if (stage.address.isNotEmpty)
                   InkWell(
                     onTap: () => _openMap(context, stage.address),
@@ -369,7 +366,7 @@ class AgendaItem extends StatelessWidget {
             ),
           ),
 
-          // Cost / Dept / Link
+          // Tarif, Département et Lien d'inscription
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
