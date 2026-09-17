@@ -14,8 +14,8 @@ class Enseignant {
 
   factory Enseignant.fromJson(Map<String, dynamic> json) {
     return Enseignant(
-      firstName: json['firstName'] ?? json['prenom'] ?? '',
-      lastName: json['lastName'] ?? json['nom'] ?? '',
+      firstName: json['firstName']?.toString() ?? json['prenom']?.toString() ?? '',
+      lastName: json['lastName']?.toString() ?? json['nom']?.toString() ?? '',
     );
   }
 
@@ -44,20 +44,28 @@ class Stage {
   });
 
   factory Stage.fromJson(Map<String, dynamic> json) {
-    // Parse enseignants array
-    var enseignantsList = json['enseignants'] as List? ?? [];
-    List<Enseignant> parsedEnseignants =
-        enseignantsList.map((item) => Enseignant.fromJson(item)).toList();
-
-    // Field mapping with fallbacks for both APIs
-    String rawDate = json['dateDebut'] ?? json['date'] ?? DateTime.now().toIso8601String();
+    // Explicitly cast JSON lists to prevent Web minification runtime errors
+    final List<dynamic> enseignantsList = (json['enseignants'] as List<dynamic>?) ?? [];
     
+    final List<Enseignant> parsedEnseignants = enseignantsList
+        .where((item) => item is Map)
+        .map((item) => Enseignant.fromJson(Map<String, dynamic>.from(item as Map)))
+        .toList();
+
+    String rawDate = json['dateDebut']?.toString() ?? json['date']?.toString() ?? DateTime.now().toIso8601String();
+    DateTime parsedDate;
+    try {
+      parsedDate = DateTime.parse(rawDate);
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
+
     return Stage(
-      id: json['_id'] ?? json['id']?.toString() ?? UniqueKey().toString(),
-      date: DateTime.parse(rawDate),
-      address: json['adresseComplete'] ?? json['address'] ?? json['place'] ?? '',
-      link: json['url'] ?? json['link'],
-      stageName: json['titre'] ?? json['stageName'] ?? '',
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? UniqueKey().toString(),
+      date: parsedDate,
+      address: json['adresseComplete']?.toString() ?? json['address']?.toString() ?? json['place']?.toString() ?? '',
+      link: json['url']?.toString() ?? json['link']?.toString(),
+      stageName: json['titre']?.toString() ?? json['stageName']?.toString() ?? '',
       cost: json['cost'] != null ? (json['cost'] as num).toDouble() : 0.0,
       dept: json['dept']?.toString() ?? json['departement']?.toString() ?? '',
       enseignants: parsedEnseignants,
@@ -87,7 +95,6 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
     const String secondaryApiUrl = 'https://api.stages-aikido.fr/public/stages';
 
     try {
-      // Execute both requests concurrently
       final responses = await Future.wait([
         http.get(Uri.parse(primaryApiUrl)).catchError((_) => http.Response('[]', 500)),
         http.get(Uri.parse(secondaryApiUrl)).catchError((_) => http.Response('[]', 500)),
@@ -97,27 +104,40 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
 
       // 1. Process Primary API
       if (responses[0].statusCode == 200) {
-        List<dynamic> body1 = jsonDecode(responses[0].body);
-        combinedStages.addAll(body1.map((item) => Stage.fromJson(item)).toList());
+        dynamic decoded1 = jsonDecode(responses[0].body);
+        if (decoded1 is List) {
+          for (var item in decoded1) {
+            if (item is Map) {
+              combinedStages.add(Stage.fromJson(Map<String, dynamic>.from(item)));
+            }
+          }
+        }
       }
 
-      // 2. Process Secondary API (Filtering by federation == 'FFAB')
+      // 2. Process Secondary API (FFAB only)
       if (responses[1].statusCode == 200) {
-        List<dynamic> body2 = jsonDecode(responses[1].body);
-        var ffabStages = body2
-            .where((item) => item['federation'] == 'FFAB')
-            .map((item) => Stage.fromJson(item))
-            .toList();
-        combinedStages.addAll(ffabStages);
+        dynamic decoded2 = jsonDecode(responses[1].body);
+        if (decoded2 is List) {
+          for (var item in decoded2) {
+            if (item is Map && item['federation'] == 'FFAB') {
+              combinedStages.add(Stage.fromJson(Map<String, dynamic>.from(item)));
+            }
+          }
+        }
       }
 
       setState(() {
         stages = combinedStages;
-        isLoading = false;
       });
     } catch (e) {
-      print("Error fetching stages: $e");
-      setState(() => isLoading = false);
+      if (kDebugMode) {
+        print("Error fetching stages: $e");
+      }
+    } finally {
+      // Guaranteed to set loading false so app never hangs on a blank screen
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -132,29 +152,31 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
       backgroundColor: Colors.white,
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : GroupedListView<Stage, String>(
-              elements: stages,
-              groupBy: (element) => DateFormat('yyyy-MM').format(element.date),
-              groupSeparatorBuilder: (String groupByValue) {
-                DateTime date = DateFormat('yyyy-MM').parse(groupByValue);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Text(
-                    DateFormat('MMMM yyyy').format(date).toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.indigo,
-                    ),
-                  ),
-                );
-              },
-              itemBuilder: (context, Stage stage) => AgendaItem(stage: stage),
-              itemComparator: (item1, item2) => item1.date.compareTo(item2.date),
-              useStickyGroupSeparators: true,
-              floatingHeader: true,
-              order: GroupedListOrder.ASC,
-            ),
+          : stages.isEmpty
+              ? const Center(child: Text('Aucun stage disponible'))
+              : GroupedListView<Stage, String>(
+                  elements: stages,
+                  groupBy: (element) => DateFormat('yyyy-MM').format(element.date),
+                  groupSeparatorBuilder: (String groupByValue) {
+                    DateTime date = DateFormat('yyyy-MM').parse(groupByValue);
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Text(
+                        DateFormat('MMMM yyyy').format(date).toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.indigo,
+                        ),
+                      ),
+                    );
+                  },
+                  itemBuilder: (context, Stage stage) => AgendaItem(stage: stage),
+                  itemComparator: (item1, item2) => item1.date.compareTo(item2.date),
+                  useStickyGroupSeparators: true,
+                  floatingHeader: true,
+                  order: GroupedListOrder.ASC,
+                ),
     );
   }
 }
@@ -246,7 +268,7 @@ class AgendaItem extends StatelessWidget {
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
 
-                // 1st Enseignant directly under title
+                // 1st Enseignant
                 if (firstTeacher != null && firstTeacher.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Row(
@@ -299,7 +321,7 @@ class AgendaItem extends StatelessWidget {
             ),
           ),
 
-          // Right Column: Price, Dept, Inscription
+          // Right Column: Price, Dept, Inscription Link
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -346,7 +368,7 @@ class AgendaItem extends StatelessWidget {
                 ],
               ),
 
-              // Inscription Link (Moved to bottom right)
+              // Inscription Link (Bottom Right)
               if (stage.link != null && stage.link!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 InkWell(
