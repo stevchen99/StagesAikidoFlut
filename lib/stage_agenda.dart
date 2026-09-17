@@ -81,12 +81,26 @@ class Stage {
       }
     }
 
+    // Process title: substring before the word "anime" / "animé"
+    String rawTitle = json['titre']?.toString() ?? json['stageName']?.toString() ?? '';
+    String processedTitle = rawTitle;
+    
+    final RegExp animeRegex = RegExp(r'\banim[eé]s?\b', caseSensitive: false);
+    final match = animeRegex.firstMatch(rawTitle);
+    if (match != null) {
+      processedTitle = rawTitle.substring(0, match.start).trim();
+      // Clean up trailing dashes or colons left after truncation
+      if (processedTitle.endsWith('-') || processedTitle.endsWith(':')) {
+        processedTitle = processedTitle.substring(0, processedTitle.length - 1).trim();
+      }
+    }
+
     return Stage(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? UniqueKey().toString(),
       date: parsedDate,
       address: json['adresseComplete']?.toString() ?? json['address']?.toString() ?? json['place']?.toString() ?? '',
       link: json['url']?.toString() ?? json['link']?.toString(),
-      stageName: json['titre']?.toString() ?? json['stageName']?.toString() ?? '',
+      stageName: processedTitle.isEmpty ? rawTitle : processedTitle,
       cost: json['cost'] != null ? (json['cost'] as num).toDouble() : 0.0,
       dept: json['dept']?.toString() ?? json['departement']?.toString() ?? '',
       enseignants: parsedEnseignants,
