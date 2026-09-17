@@ -100,19 +100,35 @@ class Stage {
 
     if (animeIndex != -1) {
       processedTitle = rawTitle.substring(0, animeIndex).trim();
-      
       if (processedTitle.endsWith('-') || processedTitle.endsWith(':') || processedTitle.endsWith(',')) {
         processedTitle = processedTitle.substring(0, processedTitle.length - 1).trim();
       }
     }
 
-    // Priorité directe sur adresseComplete puis repli sur les autres clés
-    String extractedAddress = json['adresseComplete']?.toString() ??
-        json['adresse']?.toString() ??
-        json['address']?.toString() ??
-        json['lieu']?.toString() ??
-        json['place']?.toString() ??
-        '';
+    // --- EXTRACTION DE ADRESSECOMPLETE ---
+    String extractedAddress = '';
+
+    // 1. Si adresseComplete est une clé de niveau supérieur dans le JSON
+    if (json['adresseComplete'] != null) {
+      extractedAddress = json['adresseComplete'].toString();
+    } 
+    // 2. Si adresse est un Map englobant { "adresseComplete": "..." }
+    else if (json['adresse'] is Map) {
+      extractedAddress = json['adresse']['adresseComplete']?.toString() ?? 
+                         json['adresse']['adresse']?.toString() ?? '';
+    } 
+    // 3. Si l'adresse est retournée sous forme de string brute "{region: ..., adresseComplete: ...}"
+    else if (json['adresse'] is String) {
+      String rawAddressStr = json['adresse'];
+      if (rawAddressStr.contains('adresseComplete:')) {
+        final match = RegExp(r'adresseComplete:\s*([^,}]+)').firstMatch(rawAddressStr);
+        if (match != null) {
+          extractedAddress = match.group(1)?.trim() ?? '';
+        }
+      } else {
+        extractedAddress = rawAddressStr;
+      }
+    }
 
     return Stage(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? UniqueKey().toString(),
@@ -275,7 +291,7 @@ class AgendaItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date Column
+          // Date
           Column(
             children: [
               Text(
@@ -290,7 +306,7 @@ class AgendaItem extends StatelessWidget {
           ),
           const SizedBox(width: 16),
 
-          // Stage Info Column
+          // Content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,7 +317,7 @@ class AgendaItem extends StatelessWidget {
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
 
-                // 1st Enseignant
+                // Teacher
                 if (firstTeacher != null && firstTeacher.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Row(
@@ -326,7 +342,7 @@ class AgendaItem extends StatelessWidget {
 
                 const SizedBox(height: 4),
 
-                // Map Address - Displays full address directly
+                // Address
                 if (stage.address.isNotEmpty)
                   InkWell(
                     onTap: () => _openMap(context, stage.address),
@@ -353,14 +369,13 @@ class AgendaItem extends StatelessWidget {
             ),
           ),
 
-          // Right Column: Price, Dept, Inscription Link
+          // Cost / Dept / Link
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Cost Bubble
                   if (stage.cost > 0)
                     Container(
                       margin: const EdgeInsets.only(left: 8),
@@ -378,8 +393,6 @@ class AgendaItem extends StatelessWidget {
                         ),
                       ),
                     ),
-
-                  // Dept Bubble
                   if (stage.dept.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(left: 6),
@@ -399,8 +412,6 @@ class AgendaItem extends StatelessWidget {
                     ),
                 ],
               ),
-
-              // Inscription Link (Bottom Right)
               if (stage.link != null && stage.link!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 InkWell(
