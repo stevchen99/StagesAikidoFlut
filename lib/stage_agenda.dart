@@ -12,11 +12,28 @@ class Enseignant {
 
   Enseignant({required this.firstName, required this.lastName});
 
-  factory Enseignant.fromJson(Map<String, dynamic> json) {
-    return Enseignant(
-      firstName: json['firstName']?.toString() ?? json['prenom']?.toString() ?? '',
-      lastName: json['lastName']?.toString() ?? json['nom']?.toString() ?? '',
-    );
+  factory Enseignant.fromJson(dynamic json) {
+    // Handle string inputs like "Patrice Reuschlé"
+    if (json is String) {
+      final parts = json.trim().split(' ');
+      if (parts.length > 1) {
+        return Enseignant(
+          firstName: parts.first,
+          lastName: parts.sublist(1).join(' '),
+        );
+      }
+      return Enseignant(firstName: json.trim(), lastName: '');
+    }
+
+    // Handle Map/Object inputs
+    if (json is Map<String, dynamic>) {
+      return Enseignant(
+        firstName: json['firstName']?.toString() ?? json['prenom']?.toString() ?? '',
+        lastName: json['lastName']?.toString() ?? json['nom']?.toString() ?? '',
+      );
+    }
+
+    return Enseignant(firstName: '', lastName: '');
   }
 
   String get fullName => '$firstName $lastName'.trim();
@@ -44,11 +61,11 @@ class Stage {
   });
 
   factory Stage.fromJson(Map<String, dynamic> json) {
-    // Parse teachers array safely
+    // Parse teachers array safely (handles both Map objects and raw Strings)
     final List<dynamic> enseignantsList = (json['enseignants'] as List<dynamic>?) ?? [];
     final List<Enseignant> parsedEnseignants = enseignantsList
-        .where((item) => item is Map)
-        .map((item) => Enseignant.fromJson(Map<String, dynamic>.from(item as Map)))
+        .map((item) => Enseignant.fromJson(item))
+        .where((e) => e.fullName.isNotEmpty)
         .toList();
 
     // Extract raw date field prioritizing dateDebut then date
@@ -99,10 +116,18 @@ class Stage {
       }
     }
 
+    // Extract address safely across all potential key names
+    String extractedAddress = json['adresseComplete']?.toString() ??
+        json['adresse']?.toString() ??
+        json['address']?.toString() ??
+        json['lieu']?.toString() ??
+        json['place']?.toString() ??
+        '';
+
     return Stage(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? UniqueKey().toString(),
       date: parsedDate,
-      address: json['adresseComplete']?.toString() ?? json['address']?.toString() ?? json['place']?.toString() ?? '',
+      address: extractedAddress,
       link: json['url']?.toString() ?? json['link']?.toString(),
       stageName: processedTitle.isEmpty ? rawTitle : processedTitle,
       cost: json['cost'] != null ? (json['cost'] as num).toDouble() : 0.0,
