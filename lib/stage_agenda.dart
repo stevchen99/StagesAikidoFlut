@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart0:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -64,7 +64,7 @@ class Stage {
     if (rawDate != null) {
       String dateStr = rawDate.toString().trim();
 
-      // Handle DD/MM/YYYY or DD-MM-YYYY formats from French APIs
+      // Handle DD/MM/YYYY or DD-MM-YYYY formats
       if (RegExp(r'^\d{2}[/-]\d{2}[/-]\d{4}').hasMatch(dateStr)) {
         try {
           List<String> parts = dateStr.contains('/') ? dateStr.split('/') : dateStr.split('-');
@@ -81,16 +81,20 @@ class Stage {
       }
     }
 
-    // Process title: substring before the word "anime" / "animé"
+    // Process title: Extract everything BEFORE "animé" / "anime"
     String rawTitle = json['titre']?.toString() ?? json['stageName']?.toString() ?? '';
     String processedTitle = rawTitle;
-    
-    final RegExp animeRegex = RegExp(r'\banim[eé]s?\b', caseSensitive: false);
-    final match = animeRegex.firstMatch(rawTitle);
-    if (match != null) {
-      processedTitle = rawTitle.substring(0, match.start).trim();
-      // Clean up trailing dashes or colons left after truncation
-      if (processedTitle.endsWith('-') || processedTitle.endsWith(':')) {
+
+    int animeIndex = rawTitle.toLowerCase().indexOf('animé');
+    if (animeIndex == -1) {
+      animeIndex = rawTitle.toLowerCase().indexOf('anime');
+    }
+
+    if (animeIndex != -1) {
+      processedTitle = rawTitle.substring(0, animeIndex).trim();
+      
+      // Clean up trailing punctuation if any (like dashes or colons)
+      if (processedTitle.endsWith('-') || processedTitle.endsWith(':') || processedTitle.endsWith(',')) {
         processedTitle = processedTitle.substring(0, processedTitle.length - 1).trim();
       }
     }
