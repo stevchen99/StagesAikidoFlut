@@ -13,7 +13,6 @@ class Enseignant {
   Enseignant({required this.firstName, required this.lastName});
 
   factory Enseignant.fromJson(dynamic json) {
-    // Handle string inputs like "Patrice Reuschlé"
     if (json is String) {
       final parts = json.trim().split(' ');
       if (parts.length > 1) {
@@ -25,7 +24,6 @@ class Enseignant {
       return Enseignant(firstName: json.trim(), lastName: '');
     }
 
-    // Handle Map/Object inputs
     if (json is Map<String, dynamic>) {
       return Enseignant(
         firstName: json['firstName']?.toString() ?? json['prenom']?.toString() ?? '',
@@ -61,17 +59,14 @@ class Stage {
   });
 
   factory Stage.fromJson(Map<String, dynamic> json) {
-    // Parse teachers array safely (handles both Map objects and raw Strings)
     final List<dynamic> enseignantsList = (json['enseignants'] as List<dynamic>?) ?? [];
     final List<Enseignant> parsedEnseignants = enseignantsList
         .map((item) => Enseignant.fromJson(item))
         .where((e) => e.fullName.isNotEmpty)
         .toList();
 
-    // Extract raw date field prioritizing dateDebut then date
     dynamic rawDate = json['dateDebut'] ?? json['date'];
 
-    // Handle Mongoose / MongoDB nested date objects like {"$date": "2025-10-12T00:00:00Z"}
     if (rawDate is Map) {
       rawDate = rawDate['\$date'] ?? rawDate['date'];
     }
@@ -81,7 +76,6 @@ class Stage {
     if (rawDate != null) {
       String dateStr = rawDate.toString().trim();
 
-      // Handle DD/MM/YYYY or DD-MM-YYYY formats
       if (RegExp(r'^\d{2}[/-]\d{2}[/-]\d{4}').hasMatch(dateStr)) {
         try {
           List<String> parts = dateStr.contains('/') ? dateStr.split('/') : dateStr.split('-');
@@ -90,15 +84,12 @@ class Stage {
           int year = int.parse(parts[2].substring(0, 4));
           parsedDate = DateTime(year, month, day);
         } catch (_) {}
-      } 
-      // Handle standard ISO-8601 strings or Milliseconds
-      else {
+      } else {
         parsedDate = DateTime.tryParse(dateStr) ?? 
             (rawDate is int ? DateTime.fromMillisecondsSinceEpoch(rawDate) : DateTime.now());
       }
     }
 
-    // Process title: Extract everything BEFORE "animé" / "anime"
     String rawTitle = json['titre']?.toString() ?? json['stageName']?.toString() ?? '';
     String processedTitle = rawTitle;
 
@@ -110,13 +101,12 @@ class Stage {
     if (animeIndex != -1) {
       processedTitle = rawTitle.substring(0, animeIndex).trim();
       
-      // Clean up trailing punctuation if any (like dashes or colons)
       if (processedTitle.endsWith('-') || processedTitle.endsWith(':') || processedTitle.endsWith(',')) {
         processedTitle = processedTitle.substring(0, processedTitle.length - 1).trim();
       }
     }
 
-    // Extract address safely across all potential key names
+    // Priorité directe sur adresseComplete puis repli sur les autres clés
     String extractedAddress = json['adresseComplete']?.toString() ??
         json['adresse']?.toString() ??
         json['address']?.toString() ??
@@ -166,7 +156,6 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
 
       List<Stage> combinedStages = [];
 
-      // Primary API
       if (responses[0].statusCode == 200) {
         dynamic decoded1 = jsonDecode(responses[0].body);
         if (decoded1 is List) {
@@ -178,7 +167,6 @@ class _StageAgendaPageState extends State<StageAgendaPage> {
         }
       }
 
-      // Secondary API (FFAB only)
       if (responses[1].statusCode == 200) {
         dynamic decoded2 = jsonDecode(responses[1].body);
         if (decoded2 is List) {
@@ -249,23 +237,6 @@ class AgendaItem extends StatelessWidget {
 
   const AgendaItem({super.key, required this.stage});
 
-  String _formatSingleLineAddress(String fullAddress) {
-    if (fullAddress.isEmpty) return '';
-
-    List<String> parts = fullAddress
-        .split(RegExp(r'[,\n]'))
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-
-    if (parts.isEmpty) return fullAddress;
-
-    if (parts.length >= 2) {
-      return '${parts[0]}, ${parts[1]}';
-    }
-    return parts[0];
-  }
-
   Future<void> _openMap(BuildContext context, String address) async {
     if (address.isEmpty) return;
 
@@ -294,7 +265,6 @@ class AgendaItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final formattedAddress = _formatSingleLineAddress(stage.address);
     final firstTeacher = stage.enseignants.isNotEmpty ? stage.enseignants.first.fullName : null;
 
     return Container(
@@ -356,7 +326,7 @@ class AgendaItem extends StatelessWidget {
 
                 const SizedBox(height: 4),
 
-                // Map Address
+                // Map Address - Displays full address directly
                 if (stage.address.isNotEmpty)
                   InkWell(
                     onTap: () => _openMap(context, stage.address),
@@ -366,10 +336,9 @@ class AgendaItem extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            formattedAddress,
+                            stage.address,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            softWrap: false,
                             style: TextStyle(
                               color: Colors.indigo.shade600,
                               fontSize: 13,
